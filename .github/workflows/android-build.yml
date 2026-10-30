@@ -1,0 +1,51 @@
+name: Android APK (apply port and build)
+
+# Needs android_port.py in the repository's root folder. Run it from the Actions tab:
+# "Android APK (apply port and build)" > Run workflow. The APK is the artifact horizon-android-apk.
+on:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply the Android port
+        run: python3 android_port.py
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android
+
+      - name: Android SDK and NDK paths
+        run: |
+          echo "ANDROID_NDK_ROOT=${ANDROID_NDK_LATEST_HOME}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_LATEST_HOME}" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=${ANDROID_SDK_ROOT:-$ANDROID_HOME}" >> "$GITHUB_ENV"
+
+      - name: Install cargo-apk
+        run: cargo install cargo-apk --locked
+
+      - name: Signing key (a throwaway one, the APK is for sideloading)
+        run: |
+          keytool -genkey -v -keystore "$HOME/horizon.keystore" -storepass android \
+            -alias horizon -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Horizon,O=Horizon,C=US"
+          echo "CARGO_APK_RELEASE_KEYSTORE=$HOME/horizon.keystore" >> "$GITHUB_ENV"
+          echo "CARGO_APK_RELEASE_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
+
+      - name: Build the APK
+        run: cargo apk build --release -p horizon-android
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: horizon-android-apk
+          path: target/release/apk/*.apk
+          if-no-files-found: error
+          
