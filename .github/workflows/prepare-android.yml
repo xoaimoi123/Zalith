@@ -1,0 +1,39 @@
+name: horizon-prepare for Termux
+
+# Builds the resource preparer for Android (aarch64) so it runs in Termux. Run it from the
+# Actions tab; the program is the artifact horizon-prepare-termux. It contains no Minecraft files.
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: prepare-android
+
+      - name: Android NDK path
+        run: |
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_LATEST_HOME}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=${ANDROID_NDK_LATEST_HOME}" >> "$GITHUB_ENV"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build horizon-prepare
+        run: cargo ndk -t arm64-v8a build --release -p horizon-prepare
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: horizon-prepare-termux
+          path: target/aarch64-linux-android/release/horizon-prepare
+          if-no-files-found: error
+          
