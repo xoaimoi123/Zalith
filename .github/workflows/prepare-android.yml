@@ -36,4 +36,3 @@ jobs:
           name: horizon-prepare-termux
           path: target/aarch64-linux-android/release/horizon-prepare
           if-no-files-found: error
-          
